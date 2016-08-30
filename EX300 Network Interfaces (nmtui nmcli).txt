@@ -1,0 +1,87 @@
+Network Manager
+==================================================
+To write configuration to the network card in RH7 you can use Network Mgr
+Network Mgr is a service that takes care of the network config.
+
+MAN PAGE: man 5 nm-settings
+
+PACKAGES
+
+=================================================
+
+Utilities for Network Management
+=============================
+1. nmtui: text user interface
+2. nmcli: client command line interface
+3. gui: graphical user interface ?? not sure how to initiate this
+
+
+Advantages
+=====================
+nmcli is great for scripting
+tui for ease
+gui for everything else
+
+What is a a network conniption
+============
+means to use network cards
+
+nmtui
+=====
+# nmtui
+Add -> Ethernet -> Profile Name:mynetconn 
+
+nmcli ‘devices’
+===============
+Show network devices
+# nmcli dev status
+
+nmcli ‘connections’
+====================
+Show network connections (interfaces)
+# nmcli con show
+# nmcli con show —-active
+# nmcli con show <name>
+
+Add a connection
+=================
+# con add con-name em1 type ethernet ifname em1
+Note dhcp services can be used to give IP addresses or manually
+
+Manual config of a connection
+=================
+# nmcli con add con-name em2 type ethernet ifname em2 ip4 192..168.0.10/24 gw4 192.168.0.1
+
+Modify connection
+=================
+# nmcli con mod em2 +ipv4.dns 8.8.8.8
+
+To bring up a connection
+=================
+# nmcli con up em2
+
+Disable the device instead of the connection (more complete)
+=================
+# nmcli dev dis em2
+
+Can still do it the old way but the above adds a file to 
+=================
+# /etc/systemconfig/network-scripts
+# ls -l ifcfg-*
+
+To enforce changes
+=======
+# nmcli con reload
+In the case of DNS it adds the entry to /etc/resolv.conf
+
+
+
+Show only active connections (shows partial info)
+=================
+# ip addr
+# cat /etc/hostname
+
+Change server hostname
+======================
+# hostnamectl status
+# hostnamectl set-hostname serverX.example.com

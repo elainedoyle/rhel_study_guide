@@ -1,0 +1,85 @@
+EXERCISE
+===================================
+
+Serve content from /srv/www2/www and /srv/webapp2/www
+mkdir -p /srv/{webapp2,www2}/www
+restorecon -Rv /srv
+ls -lZ /srv/*
+
+Create the ‘alternative’ content directories in /srv directory with file that reads
+# mkdir -p /srv/{www2,webapp2}/www
+
+Reset context on /srv
+========================
+# restorecon -Rv /srv
+Check Context
+# ls -Z /srv
+
+Each virtual host needs a configuration file. ========================================================================
+www2.conf in /etc/httpd/conf.d/
+
+Give the virtual host the following details
+==============================================
+= Configure this block to be read by all incoming connections over :443 (*:443)
+= DocumentRoot /srv/www2/www
+= Logs log/www2.log
+= Open up access to the content (<Directory> block - Require all granted)
+
+<VirtualHost *:443>
+  DocumentRoot /srv/www2/www
+  CustomLog “log/default-vhost.log” combined
+  ServerName www2.example.com
+  SSLEngine On
+  SSLProtocol all -SSLv2 -SSLv3
+  SSLCipherSuite HIGH:MEDIUM:!aNULL:!MD5
+  SSLCertificateFile /etc/pki/tls/certs/www2.crt
+  SSLCertificateKeyFile /etc/pki/tls/private/www2.key
+  SSLCertificateChainFile /etc/pki/tls/certs/example-ca.crt
+</VirtualHost>
+
+<Directory /srv/default/www>
+  Require all granted>
+</Directory>
+
+
+The addition of AUTOMATIC REDIRECT from http to https is block
+
+<VirtualHost *:80>
+  ServerName www2.example.com
+  RewriteEngine On
+  RewriteRule ^(/*.)$ https://{HTTP_HOST}$1 [redirect=301]
+</VirtualHost>
+
+
+Ensure firewall rule is set to permit the http and https services
+==========================================
+#firewall-cmd —-get-all | grep http
+#firewall-cmd —-permanent —-add-service=http https
+#firewall-cmd —reload
+
+Restart or start/enable the httpd service
+==========================================
+systemctl restart httpd
+
+
+To verify
+=========
+You need the below entries to be resolvable in /etc/hosts
+curl -k https://www2.example.com
+curl -k http://webapp2.example.com
+curl -k http://www2.example.com
+curl -k http://webapp2.example.com
+
+curl -k https://server2.example.com….
+reads page /var/www/html/index.html page !
+
+Errors can be displayed by running:
+systemctl status httpd -l
+
+some of the default config is read/displayed when you run
+/usr/sbin/httpd -S
+
+
+
+
+

@@ -1,0 +1,143 @@
+
+What is NFS
+===========
+Network File System commonly used for network-attaching storage devices to multiple clients to share access to files across a network
+
+NFS protocol transmits data in clear text
+Recommended the user of Kerberos Authentication 
+
+Package requirements: nfs-utils
+
+
+
+Basic NFS MOUNTING
+===================
+
+Basic Format of server exporting the dir
+———
+Services: 	nfs enabled/started, rpcbind enabled/started, 
+		reload of exports after config (exportfs -a)
+
+Firewall:	firewall-cmd —-permanent -—add-service=nfs
+		fireewall-cmd —-reload
+
+Steps:		Create share: 	mkdir -p /nfsshare
+		Set perms:		chown nfsnobody /nfsshare 
+					(if it is to be accessed by root for testing)
+		Edit Config file: 	/etc/exports
+		New entry here for sir being shared
+		Syntax:  		/dir_to_be_exported       serverallowedtoconnect.example.com(options)
+		Note: 			server must be DNS contactable/IP /etc/hosts defined
+					Can also define a range of hosts using wildcards
+/dir_exported			*.example.com
+/dir_exported			server[0-20].example.com
+/dir_exported			192.168.0.3
+/dir_exported			192.168.0.3(ro)		—options in brackets!
+/dir_exported			192.168.0.3/24
+/dir_exported			2000:472:18:b51::/64
+/dir_exported			192.168.0.3 *.example.com
+/dir_exported			192.168.0.3(ro) 192.168.0.2(rw)
+/dir_exported			192.168.0.3(rw,no_root_squash)  -allows root NFS access
+
+
+Basic format of server mounting the dir
+—-
+Direct to hold the mount:
+Entry in /etc/fstab
+Syntax:	server_hosting_mount:</mount>	<local_mount_dir> nfs defaults 0 0 
+
+Manual mount: mount -a & reboot to test
+	
+
+
+PROTECTED NFS SHARE
+==================
+
+
+Packages:		nfs-utils (nfs-secure-server & nfs-secure are the services)
+
+Requirements:		Kerberos key tab /etc/krb5.keytab (containing nfs or host principal)ss
+			add keytab to source & target hosts
+			wget -O /etc/krb5.keytab http://location/pub/keytabs/server{1,2}.keytab
+
+Steps:			On source server
+			Install nfs-utils	
+			Restart rpcbind nfs 
+			Services: start|enable nfs-secure-server	
+
+			Add firewall rule for nfs		
+
+			mkdir /securedepot	
+			(if testing you can set chown nfsnobody /securedepot
+			
+			Add entry to /etc/exports
+			/securedepot *.example.com(sec=krb5p,rw) 
+			exportfs -a
+			exportfs -v
+			
+
+Steps:			On target server (server mounting the secure depot)
+			Add the key tab
+			Restart rpcbind nfs 
+			Start|enable nfs-secure
+
+			Add firewall rule for nfs		
+
+			# mkdir /mount/securedexport
+
+			Try manually mount from the other host
+			# mount -o sec=krb5p server2:/securedepot /mount/securedexport
+			# umount /mount/securedexport
+					
+	
+
+
+Sometimes NFS mount points need labeling 
+
+You can mount the nfs share with a label
+TO get the label: 
+# semanage fcontext -l | grep public_content & apply this
+
+On the client to manually mount (too complex….see below easier way)
+# mount -o context=“system_u:object_r:public_content_rw_t:s0” serverX:/share /mnt/sharename
+On the server
+# touch /mnt/sharename/test_file
+# chcon -t public_content_t /securedepot/test_file
+
+You can also force use ifs v4.2 which forces NFS to export the SElinux context of the share
+You need to specify this in the mount command in /etc/fstab on the mounting server 
+
+
+
+TO MAKE CONTEXT AVAILABLE ON A MOUNT …. target the NFS-SECURE-SERVER host first
+
+
+i.e. On the server to enable contexts to be available
+1. add -V 4.2 to sysconfig/nfs
+To enable contexts to be used you must update /etc/sysconfig/nfs & restart the service
+RPCNFSDARGS=“-V 4.2”
+2. restart services nfs-secure-server
+3. enable firewall for nfs, reload
+4. Export normally….
+   # vi /etc/exports
+	/securedepot *.example.com(sec=krb5p,rw)
+   # exportfs -a
+   # exportfs -v
+5. # touch /securedepot/testfile.txt
+   # chown ldapuser1:ldapuser1 testfile.txt; chmod 644 testfile.txt
+   # ls -lZ /securedepot/testfile.txt (should be default_t)
+6. Set context to public_content_t
+   # chcon -t public_content_t /securedepot/testfile.txt
+
+
+Notes:  Server makes v4.2 available (sysconfig/nfs)
+	 Server exports the dir normally (sec=krb5p,rw)
+	 Client reads it by using v4.2 in /etc/fstab line
+
+
+On client
+1. Amend /etc/fstab to include v4.2
+server2:/securedepot  /mount/securedexport nfs defaults,v4.2,sec=krb5p 0 0
+
+
+

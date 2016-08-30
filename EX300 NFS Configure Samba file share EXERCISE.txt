@@ -1,0 +1,75 @@
+
+SMB (Server Message Block) File Shares
+=======================
+
+Packages:   
+(Client Side)	cifs-utils 
+(Server Side)	samba or group install file-server 
+            	samba-client (smbpasswd)
+(Server Side) Services: smb nmb
+		FW -add-service=samba
+Config file on Server: /etc/samba/smb.conf
+Utility: cifscreds 
+Refs: cifscreds, mount.cifs, mount
+
+TASK
+=========
+- share /smbshare using SMB
+- RW -> marketing group
+- RO everyone else
+- Samba server in MYCOMPANY workgroup, sharename = smbshare
+- User rob/redhat is not part of marketing team, brian/redhat IS part of marketing team
+
+INSTALLATION:
+
+On Samba Server
+===============
+# yum install -y samba; yum group install file-server
+Setup share, with perms, owner & context
+# mkdir /smbshare
+# groupadd marketing
+# chgrp marketing /smbshare
+# chmod 2775 /smbshare (suid)
+# semanage fcontext -l | grep samba
+# semanage fcontext -a -t samba_share_t ‘/smbshare(/.*)?’
+# restorecon -RvvF /smbshare
+
+On Samba Server
+================
+Configure samba stuff(/etc/samba/smb.conf)
+vi /etc/samba/smb.conf
+add workgroup
+add section for the samba share perms/users
+[smbshare]
+path = /smbshare
+write list = @marketing
+
+On Samba Server
+=====================================
+# yum install -y samba-client
+Create samba user brian part of marketing group
+# useradd -s /bin/nologin -G marketing brian
+# smbpasswd -a brian
+Create samba user rob NOT part of marketing group
+# useradd -s /bin/nologin rob
+# smbpasswd -a rob
+
+systemctl start smb nmb
+systemctl enable smb nmb
+firewall-cmd —-permanent -—add-service=samba
+firewall-cmd -—reload 
+
+On Client
+=========
+Create directories for each user
+mkdir -p /samba/brian
+mkdir -p /samba/rob
+
+Temporarily mount the remote share /smbshare on the client & check the perms
+mount -o username=brian //server2/smbshare /samba/brian
+enter passwd
+touch /samba/brian/testfile
+
+mount -o username=rob //server2/smbshare /samba/rob
+
+

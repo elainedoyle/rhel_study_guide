@@ -1,0 +1,35 @@
+EXERCISE
+========
+
+REQUIREMENTS: allow sshd to bind to new port (999/tcp)
+protect it using a firewall rule, allow in ‘work’ zone
+Route all connections from 172.25.1.0/24 through work zone 
+Port 999/tcp should also be available in the work zone
+
+1. Verify sshd is available on 22 & 999
+# ss -tupln | grep sshd
+Restart sshd to check the config
+# grep Port /etc/ssh/sshd_config
+
+
+2. Tell SELINUX you want to bind 999/tcp to sshd
+Note: This command is in /etc/ssh/sshd_config
+# semanage port -l | grep sshd (you get the port label ssh_port_t)
+Add port label of type ssh_port_t to port 999 which will be used over protocol tcp
+# semanage port -a -t ssh_port_t -p tcp 999
+
+
+3. Update the firewall config for the default/working zone to allow connectivity over port 999/tcp
+Allow connections from your other (fictitious) network
+# firewall-cmd -—permanent —-zone=work —-add-port=999/tcp
+# firewall-cmd —permanent —-zone=work —-add-source=172.68.10.2/24
+
+
+4. Restart/reload services
+systemctl restart sshd
+firewall-cmd -—reload
+
+
+5. To test
+ssh -p 999 root@yourhost
+

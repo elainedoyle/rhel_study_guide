@@ -1,0 +1,281 @@
+
+To install the RHEL : Virtual Box
+Min RAM: 156MB Recommended for Graphical User Interface: 1GB
+Min HD : 4GB   Recommended for usability 10-20GB
+Network: Some SW needs to be retrieved from RHN/Satellite
+       : Access to RH7.iso
+
+FIRST THINGS TO DO
+
+(check NTP: chronyc sources -v)
+on your mac setup NTP (kerberos needs correct system times -> https://theredblacktree.wordpress.com/2015/01/19/make-your-mac-osx-serve-as-a-ntp-time-server/)
+
+1.
+Is graphical.target set.
+If not set it.
+List all targets: systemctl list-units -t target -a
+#systemctl get-default
+#systemctl set-default graphical.target
+
+
+2. 
+Is ipv4 ip_forwarding set
+# sysctl -a | grep ip_forward 
+To set
+#vi /etc/sysctl.conf
+To enable
+#sysctl -p (also sysctl —system)
+Check
+
+
+VERY IMPORTANT:
+yum install -y policycoreutils-gui firewall-config
+
+
+3. Remember regex for fcontext:   <dir>(/.*)?
+semanage fcontext -a -t httpd_sys_content_t  <dir>(/.*)?	** required for diff dir webcontent q
+semanage port -l | grep <type i.e. http>              		** required for wsgi web config
+
+
+4. Remember json format for team
+‘{“runner” : {“name”: “active backup”}}’
+See : man teamd.conf
+See : man nmcli-examples for team commands
+
+5. Remember the redirect VirtualHost syntax
+   RewriteEngine On
+   ReWriteRule ^(/.*)?  https://%{HTTP_HOST}$1 [redirect=301]
+
+
+6. Remember packages for different tasks
+
+iSCSI:
+======  
+Initiator Package: 	iscsi-initiator-utils
+Target Package:	targetcli
+Utility:		targetcli (use to setup storage on target)
+			iscsiadm (discover & login to target)
+Services:		enable/start targetcli
+Firewall:		-—add-port=3260/tcp
+Target Stuff
+============
+BACKSTORE: CONNECT targetcli to LV
+PORTAL: MYTARGETIP
+ACL:IQN:INITIATOR
+LUN:/backstores/block/serverX.diskX
+#targetcli
+targetcli/backstores/block>  create serverX.disk1 /dev/iSCSI_vg/disk1_lv
+targetcli/iscsi>		 create IQN.2015-05.com.example:serverX
+targetcli/iqn../tpg1/lun>	 create /backstores/block/serverx.disk1
+targetcli/iqn../tpg1/acl>	 create IQN.2015-05.com.example:desktopX
+targetcli/iqn../tpg1/portal> create myIPorHostname
+Initiator Stuff
+==============
+Conf file: 	/etc/iscsi/iscsid.conf
+		Put in InitiatorName=iqn…:desktopX
+Start/enable: iscsi
+Discover:	iscsiadm -m discovery -t sendtargets -p serverX (node rec written)
+Login:		iscsiadm -m node -T iqn.:serverx -p serverx -l	
+Session Info:	iscsiadm -m session -P 3
+Other tags:	serverX -u (logout)
+		-o delete (delete node info)
+
+lsblk or /proc/partitions
+check restart of iscsi that target node info exists still 
+/var/lib/iscsi/nodes
+
+mkfs & add to /etc/fstab ENSURE you use the type: _netdev
+e.g. UUID=“dfdsf”	/mount	xfs	_netdev 00
+
+FIREWALL:
+=========
+Daemon: 	firewalld 
+other:  	iptables,ip6tables & eatables must be masked
+Man: 		firewalld.direct|richlanguage|firewall-cmd
+Utility: 	GUI Utility called: firewall-config
+ 		Utility can be used for adding rich rules, setting default zones etc
+Note: 	Ensure you ssh -X root@servername & target is graphical.target
+	Ensure you are on the ‘PERMANENT’ copy of the config within the tool
+
+
+TLS:
+=======
+Package:	mod_ssl crypto-utils
+Service: 	https (port 443)    NOTE: MUST enable service:https on firewall-cmd
+		firewall-cmd —-permanent —-add-service=https
+Conf: 		/etc/httpd/conf.d/ssl.conf (installed by mod_ssl)
+Virtual Conf:   /etc/httpd/conf.d/00-vhost.conf
+Other:		Standard content served from /var/www/html
+		Can see selinux fcontext of this for ref: ls -lZd /var/www/html
+		always check the contexts of base dirs for virtual hosts
+		restorecon -Rv /<dir>		
+		semanage -
+
+
+HTTP:
+======
+Package: 	httpd httpd-manual webserver
+Service: 	http (port 80)  NOTE: MUST enable service:http on firewall-cmd
+		firewall-cmd —-permanent —-add-service=http
+To Check:	curl http://serverX.example.com/index.html
+Syntax ChkTool: apachectl
+
+
+
+
+
+
+
+CACHING NAMESERVER (UNBOUND)
+===================
+Package: unbound
+Service: dns
+Utility: unbound-control
+Conf: /etc/unbound/unbound.conf
+Syntax Check Tool: unbound-checkconf
+Man Pages: unbound-control unbound unbound.conf unbound-checkconf (dnssec-trigger)
+
+
+POSTFIX (sendmail replacement in RH7)
+========
+Package: postfix
+Conf File: /etc/postfix/main.cf
+Utility: postconf <value>  queries config
+Values: MMMRIL (acronym)
+Command Line Edit: postfix -e ‘setting = value’
+
+Example Settings
+myorigin: 		<myhostname>.example.com:if emails are forwarded
+mydestination: 	Usually blank as this host itself doesn’t receive mail 
+mynetworks: 		Networks that you accept email from
+relay host: 		Server you ‘send’ email on to for processing
+inet_interface: 	loopback-only
+local_transport: 	disabled; this server doesn’t really receive email
+
+postfix -e ‘myorigin=server.example.com’
+postfix -e ‘mydestination=‘
+postfix -e ‘mynetworks=192.x.x.y.24’
+postfix -e ‘relayhost=‘hostname.example.com’
+postfix -e ‘inet_interface=loopback-only’
+postfix -e ‘local_transport=error: local transport disabled’
+
+Test: mutt -f imaps://<server>.example.com
+username/password.
+Check mail has arrived
+
+
+HTTPD-MANUAL
+===========
+To make the man page available
+1. Start/enable httpd
+2. Enable firewall
+3. Amend https.conf
+# vim /etc/httpd/conf/httpd.conf
+Amend
+ServerAdmin	webmaster@serverx.example.com
+4. Add index.html file in default doc root
+# vim /var/www/html/index.html
+Add something readable
+Open firefox
+http://serverx.example.com/manual
+5. Check *:80 in httpd.conf
+6. curl http:serverx.example.com/manual
+Note: for https use ‘curl -k’
+
+HTTP & SELINUX
+==============
+Command:	semanage port -l | grep http
+Man Pages:	httpd_selinux, semanage_fcontext
+Package:	selinux_policy_devel
+Setting selinux context on http stuff
+For new docroots the following is important
+1. Document Roots must be readable (not writeable) by the apache user/group
+2. You must set the selinux context
+#semanage fcontext -a -t httpd_sys_content_t ’/new/docroot(/.*)?’
+#restorecon -Rv /dir
+#semanage port -l
+DEFAULT CONTEXT = httpd_sys_content_t
+3. Sometimes other perms are necessary (setfacl/getfacl)
+# setfacl -R -m g:webmaster:rwX /new/docroot
+# setfacl -R -m d:g:webmaster:rwx /new/docroot
+X=sets executable bit on directories (instead of dirs & files) 
+
+
+HTTP & VIRTUAL HOSTS (see HTTPS above)
+=====================
+Config: /etc/httpd/conf.d/00-vhost1.conf
+Config is in the <VirtualHost> block
+
+<VirtualHost 192.168.0.1:80>
+  DocumentRoot /srv/site/www
+  ServerName site1.example.com
+  ServerAdmin webmaster@site1.example.com
+  ErrorLog “logs/site1_error_log”
+  CustomLog “logs/site1_access_log” combined
+</VirtualHost
+
+<Directory /dir>
+  Require all granted
+</Directory> 
+
+
+HTTPS(TLS)
+===========
+Package:	crypto_utils (gives genkey utility), ssl_mod
+Services:	https (including firewall service added)
+Files:		/etc/pki/tls
+.csr		./certs -> cert request (for CA)
+.crt		./certs -> returned from CA or created if self-signed 0644
+.key 		./private -> Private Key, 0600 perms
+Config:	Usually virtual host config using SSL (for https)
+		See ssl.conf in /etc/httpd/conf.d/ as guide
+		NOTE: ENSURE you remove everything OUTSIDE of <VirtualHost> </VirtualHOst>
+
+
+HTTPS & WEBSERVER
+=================
+Package:	httpd, webserver httpd-manual
+		policycoreutils-gui
+
+
+MARIADB
+========
+Firewall:	—add-service=mqsql
+Packages:	group install mariadb mariadb-client (ensure this is on your client too)
+Utility:	To configure: mysql_secure_installation
+Config:	/etc/my.cnf
+Login:		mysql -u root(or other) -p(prompt for pw)
+Commands::	show databases; show tables; use <db>
+		show grants for ‘user’@‘host’
+Dump:		mysqldump -u root -p inventory|—all-databases > file.dmp
+Restore:	mysql -u <user> <schema> < file.dmp
+Updates:	update tablename(colname) set values(‘value’) where id=‘rowed’;
+		insert into tablename(name,seller,phone) values(‘HP’,’xxx’,’tty’);
+
+
+TEAMING
+========
+Man Pages:	mmcli, nmcli-examples, teamd.conf
+Commands:	take then from ‘EXAM’ section of nmcli-examples
+		mmcli con add, mmcli con mod, 
+		teamnl team0 ports
+		teamctl team0 config dump
+		ping -I team0 <ip>
+		teamctl team0 show|state
+		ip adde show, ip link
+		mmcli con show (important for ifaces to have ‘device’
+
+
+NFS
+====
+
+
+NFS SMB
+=======
+
+
+JOUNRNALD/SYSTEMD
+=================
+
+
+

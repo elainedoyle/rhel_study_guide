@@ -1,0 +1,51 @@
+#ISCSI
+
+INTRO
+=====
+iSCSI: Internet Small Computer System Interface 
+iSCSI is a tcp/ip based protocol for emulating high performance local storage over IP networks.
+
+ADVANTAGES
+==========
+= can be used over wide distances
+= provides location independent data storage retrieval using distd servers and arrays
+ 
+CONCEPTS
+========
+INITIATOR: server using the storage remotely (server1)
+YUM SW required: iscsi-initiator-utils
+
+TARGET: server where storage is provisioned from (server2)
+YUM SW required: targetcli
+
+ACL: initiators are tied to targets, acls used for this 
+iSCSI uses ACL’s to provide LUN masking which manages accessibility to the target
+
+LUN: Logical Unit that is provisioned as storage, made available to a target (through a portal IP)
+
+
+PORTAL: Usually IP of the TARGET where the storage is provisioned from but refer to either initiator or target
+
+TPG: Target Portal Group: A set of IP’s and ports that the target will listen on
+
+IQN: Identifier, similar to WWN, iSCSI Qualified Name
+Naming Format:   IQN.YYYY-MM.com.reversed.domain:[optional]
+
+node: iSCSI target or initiator
+
+discovery: process of querying a target server to list available storage/targets
+
+login:  to use storage (or initiate block device use) on the initiator you need to use -l to login
+
+
+
+OTHER NOTES
+============
+= targetcli is an interactive shell & a command-line utility, it supports tab completion & has a directory hierarchy.
+
+= There are 4 types of storage you can configure with iSCSI, these are called BACKSTORES
+  - BLOCK DEVICE (disk drive/partition/vol group etc) 
+  - FILEIO (vm disk images)
+  - PSCSI (physical SCSI passthrou)
+  - RAMDISK 
+

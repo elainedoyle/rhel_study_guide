@@ -1,0 +1,24 @@
+List all selinux booleans
+=========================
+#getsebool -a
+
+List all selinux contexts/labels (grep optional)
+=================================
+#semanage fcontext -l | grep -i http
+semanage fcontext -l | grep -i httpd_sys| grep srv
+
+Man pages
+==========
+man semanage_selinux
+man semanage_fcontext look at EXAMples
+
+Check existing label
+===============
+# ls -lZ /var/www/file
+# ls -ldZ /dir
+
+Change/add an selinux context/label
+===================================
+# semanage fcontext -a -t httpd_sys_content_t ‘/srv/(/.*)?’
+# restorecon -Rv /srv
+# ls -ldZ /srv

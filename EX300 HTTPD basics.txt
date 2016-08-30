@@ -1,0 +1,122 @@
+
+APACHE (Originally called this because it was ‘A Patchy Webserver’
+=======
+
+INTRO
+========= 
+Apache -> one of most used web servers on the internet
+Web Server -> daemon that speaks to http(s) protocol
+HTTPS -> a text based protocol for sending/receiving objects over a net connection
+http	->	80/tcp
+https	->	443/tcp (tls/ssl encrypted version of http)
+
+
+OPERATION
+==========
+In a basic http exchange a client connects to server requesting a resource (using the GET command)
+Other commands (HEAD, POST) client can request metadata only or more info.
+
+
+ABOUT Apache HTTPD
+===================
+- also called httpd 
+- It can be extended with modules to extend functionality (plug-ins)
+- fully configurable & extendable web server
+- provided in RHEL7 in httpd package
+
+
+IMPORTANT NOTE about man pages
+==============================
+If you install the “web-server” package not only do you get httpd you also get
+httpd-manual
+Once the https service is running the full manual is available on http://localhost/manual
+
+
+TO INSTALL
+============
+# yum install -y httpd 			** this also installs dependency httpd-tools
+# yum install -y httpd-manual		** available on http://localhost/manual
+# systemctl start httpd
+# systemctl enable httpd
+		 	
+- main file /etc/httpd/conf/httpd.conf
+- content served from /var/www/html
+
+
+DEFAULT CONFIGURATION IS IN
+===========================
+/etc/httpd/conf/httpd.conf
+
+
+BASIC SYNTAX OF HTTPD.CONF
+==========================
+ServerRoot “/etc/httpd”			## https will look here for config files
+Listen 80 				## Start listening for incomings 
+Listen 10.4.4.67:80 			## IPV4 example
+Listen [2001:db8::1]:80			## IPV6 example
+## Diff listen directives can be used but overlapping listen directives will cause fatal error
+User apache				## Some ports(under1024) bound as root - then reverts to apache
+Group apache				
+ServerAdmin root@localhost    		## Mail address that can be contacted for errors - useful
+
+<Directory />		</Directory>	## Block which sets config directives for /
+
+DocumentRoot	“/var/www/html”		##Where https will search for requested files
+				## Must be readable by https (regular & SELINUX !!)
+				## <Directory block must have details allowing this access 
+<Directory 	“/var/www/html”/>
+ Options Indexes FollowSymLinks	## something about showing dir if index.html doesn’t exist
+	AllowOverride None	       ## .htaccess files can’t be read
+	Require All Granted 		## Allow access to this dir
+</Directory>
+
+ErrorLog “logs/error_log”	## relative dir to ServerRoot ie. /etc/httpd/logs/error_log 
+					## is usually ln to /var/log/httpd
+
+CustomLog				## Takes 2 parameters 1) file to log to 2) format	    
+CustomLog “logs/access_log” combined	## combined is usually defined up above in the LogFormat section
+
+
+NOTES ON HTTPD PORT
+==================
+Defaults are 80 and 443
+selinux only allows https to bind to these ports.  To check
+# semanage port -l | grep httpd
+If a nonstandard port is required you will need to set it up using:
+# semanage port -a -t http_port_t -t tcp <port#>
+restart httpd
+
+
+NEW DOC ROOT
+==========================
+By default only root has write access to DocumentRoot
+
+If you have a new doc root you need to consider the below
+
+1 — apache user needs read access (never write access)
+
+2 - SELinux context needs to be added to the directory
+# semanage fcontext -l | grep httpd | grep content
+To add
+# semanage fcontext -a -t httpd_sys_content_t ‘/new/dir(/.*)?’
+
+
+ALLOWING WRITE ACCESS TO A DOC ROOT
+===================================
+You could use setfacl (see below)
+Below gives write access to a group for EXISTING DocumentRoot
+# setfacl -R -m g:<group>:rwX /var/www/html		(X gives exec on dirs only)
+# setfacl -R -m d:g:<group>:rwx /var/www/html 
+
+OR
+
+Create new document root with the STICKY bit set
+# mkdir -p -m 2775 /new/docroot
+# chgrp <group> /new/docroot
+
+
+
+
+
+
+

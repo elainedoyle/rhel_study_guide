@@ -1,0 +1,241 @@
+#ISCSI
+
+INSTALL REQUIRED PACKAGES, START SERVICES
+====================================================
+
+Determine which host will ‘serve’ clients & host the storage
+
+INSTALL PACKAGE
+===============
+yum install -y targetcli
+
+ENABLE PACKAGE
+===============
+systemctl start target; systemctl enable target; systemctl status target
+
+
+CONFIGURE FIREWALL
+=================
+= find port that iscsi works on (3260/tcp)
+grep iscsi /etc/services
+
+firewall-cmd —-permanant —-add-port=3260/tcp
+firewall-cmd —reload
+firewall-cmd —list-all
+
+
+WHAT DISK CAN I USE TO CREATE ISCSI TARGET
+====================================
+NOTE: THE BELOW CAN CATCH YOU OUT….…don’t say I didn’t warn you !!!
+There may NOT be an available LV/DISK on the machine you’re being tested on…
+watch out . . .  you may be asked to create a FILEIO backstore instead.
+Both types outlined below.
+
+
+CREATING A BLOCK DEVICE AS YOUR BACKSTORE
+=========================================
+
+a) block device (/backstores/block)
+—————————————————
+If there is a space device available when you run % fdisk -l, create a block device
+Note: A block device can be a disk drive, a disk partition (/dev/sdb2), a logical volume, multi path device)
+Unless it STATES that you need to create a LV….don’t do it. Use the disk partition in your 
+“create /backstores/server1.disk1  /dev/sdb2
+
+OR create an LV
+fdisk /dev/vdb
+n (new)
+p (primary)
+1 (default)
+sector xxxx (take default)
+size (to what ever size the Q tells you to) +1G
+t (type 8e or 83)
+w (write)
+exit
+= Check
+cat /proc/partitions ** should see the dev type you chose above
+lschk
+
+CONFIGURE THE NEW PARTITION TO BE USABLE with ISCSI
+pvcreate /dev/sdb1
+vgcreate iSCSI_vg /dev/vdb1
+lvcreate -n disk1_lv iSCSI_vg
+lvdisplay iSCSI_vg/disk1_lv
+
+
+# targetcli
+
+** BLOCK DEVICE
+> cd /backstores/block 
+> create server2.disk1 /dev/iSCSI_vg/disk1_lv
+> ls
+
+
+CREATING A FILEIO DEVICE (FILE AT OS LEVEL) AS YOUR BACKSTORE
+===================================
+When you run fdisk if you don’t have another disk to work with…create a file of the required size
+
+** FILEIO DEVICES (this creates the file of size X Gbon the OS where ever you’ve space
+> cd /backstores/fileio
+> create iscsifile /iscsifile.img 1G
+(IMPORTANT : check when you exit # ls -l /iscsifile.img)
+
+
+CONFIGURE ISCSI NAME
+=============
+This is your iscsi name, a client/initiator will use this name to connect to you
+You use the FQDN backwards & the hostname to make it UNIQUE
+
+> cd /iscsi
+> create IQN.2016-13.com.example:serverX
+
+
+Below tpg1, three objects have been defined:
+==============================================
+acls:    (access control lists: restrict access to resources),
+luns:    (logical unit number: define exported resources),
+portals: (define ways to reach the exported resources; pairs of IP addresses & ports).
+
+
+=============================
+Amend the TPG (target portal group) attributes 
+
+PORTAL:What IP/PORT does this TARGET need to LISTEN ON
+>cd iqn.2015-05.com.example:serverX/tpg1/
+cd portal
+>create 172.25.10.11 3260
+(default port of 3260/tcp is used so ENSURE your firewall is open to this)
+
+LUN: Add your block/fileio device in /backstores
+>cd luns
+>create <put in /b then tab….it will fill it out.
+put in b (for block) and tab…
+put in f (for fileio) and tab
+
+ACL: What clients can access this iSCSI storage
+You’re creating a unique reference for the host that will connect
+Note : This name will go into /etc/iscsi/initiator.conf file on the client
+Define the server accessing the storage remotely here
+cd acls
+>create iqn.2015-05.com.example:server1
+
+
+
+LIST & SAVE CONFIG
+==================
+>cd /
+>exit (saves config automatically in RHEL7.2)
+
+
+NOW, DO I WANT TO LOOSE MY CONFIG >>> NO >>> RELOAD TARGET
+# systemctl restart target
+# systemctl status target
+
+
+
+**********************************************************************************
+
+
+
+
+INSTALL ISCSI-INITIATOR-UTILS ON YOUR CLIENT HOST
+==================================================
+# yum install -y iscsi-initiator-utils
+
+Add your initiator name to the conf file (this should be the same as you’ve defined in the ACL section in targetcli on the other host
+# vi /etc/iscsi/initiatorname.iscsi
+  
+InitiatorName=iqn.2016-01.com.example:server1
+
+
+ENABLE THE ISCSI SERVICE
+=======================
+systemctl enable iscsi; systemctl status iscsi
+
+
+DISCOVER & LOGIN TO THE TARGET (must be done BEFORE block devices can be used)
+===================================================================
+Node records will be in /var/lib/iscsi/nodes/iqn…./IP/default
+Defaults in /etc/iscsi/iscsid.conf
+MAN PAGE : man iscsiadm : go to ‘EXAMPLE’ section
+
+Discover the TARGET
+# iscsiadm —-mode discovery —-type sendtargets —-portal remote_serverIP
+
+Login to the TARGET
+# iscsiadm —-mode node -—targetname iqn.2016-05.com.example:remote_server -—portal remote_serverIP -—login
+
+Start Services on the Initiator
+# systemctl start iscsi; # systemctl enable iscsi
+
+# tail /var/log/messages
+
+See if Vol is avail
+# lsblk (see sdc e.g)
+
+
+
+TO SEE MORE INFO ABOUT THE TARGET
+==================================
+#iscsiadm -m session -P 3 | grep -i attach
+
+
+IDENTIFY THE NEWLY AVAILABLE BLOCK DEVICE CREATED BY THE ISCSI TARGET LOGIN
+===================================
+lsblk
+cat /proc/partitions
+tail /var/log/messages
+ls -lR /var/lib/iscsi/nodes/
+
+
+ENSURE WHEN YOU RESTART ISCSI THE BLOCK DEVICE STILL EXISTS
+# systemctl restart iscsi
+#lsblk
+
+
+UNATTACH from the target. The config should stay in place
+=================================
+#iscsiadm -m node -T iqn.2015-05.com.example:serverX -u
+ls -lR /var/lib/iscsi/nodes/
+When you run this, it removes the block device from the OS
+lsblk should show that its missing..
+
+restart the daemon: systemctl restart iscsi
+*** The ISCSI daemon should log back in & lsblk should list it again.
+
+
+DELETE LOCAL NODE INFO RUN
+===============================
+#iscsiadm -m node -T iqn.2015-05.com.example:serverX -p serverX -o delete
+Check that the file denoting the node is gone
+ls -lR /var/lib/iscsi/nodes
+
+restart the daemon: systemctl restart iscsi 
+On target:  systemctl restart target
+
+The discovery alone should bring the config back
+============
+# iscsiadm -m discovery -t st -p 172.25.10.11
+cat /proc/partitions & lsblk to check
+
+
+CREATE NEW FS ON YOUR INITIATOR & MOUNT the NEW FS as PERSISTENT
+===================================
+# mkfs -t xfs /dev/sda
+# blkid /dev/sda
+# mkdir /iscsidata
+# vi /etc/fstab
+ADD THE FOLLOWING LINE NOTE <<<< _netdev >>>> as type…this tells the mount NOT to come up until 
+persistent services have been started (iscsi)
+
+UUID=wefjj1231318290898		/iscsidata	xfs	_netdev	0 2
+
+# mount -a
+# df -h
+
+reboot to test
+
+
+
+
+

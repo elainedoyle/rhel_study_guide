@@ -1,0 +1,54 @@
+
+SMB (Server Message Block) File Shares
+=======================
+Packages: 
+Client:   cifs-util samba 
+Server:   yum group install file-server
+          samba samba-client
+Utility: cifscreds
+Config file: /etc/samba/smb.conf
+Services: smb nmb
+Firewall: samba
+Refs: cifscreds, mount.cifs, mount
+
+TASK
+=========
+- Mount SMB share smbshare with multiuser option
+- Desktop mount point /mnt/multiuser
+- creds file /root/smbmultiuser.txt (brian redhat)
+- associate server:smb user brian with desktop:OS user brian
+
+INSTALLATION
+
+
+On Client
+============
+# yum install -y cifs-utils (has cifscreds utility)
+
+# firewall-cmd —permanent —add-service=xxxxxx
+# firewall-cmd —reload
+# firewall-cmd —list-all
+
+mkdir /mnt/multiuser
+put creds in file 
+echo ‘username=brian’ > /root/smbmultiuser.txt
+echo ‘password=redhat’ >> /root/smbmultiuser.txt 
+
+vi /etc/fstab
+//serverx/smbshare	/mnt/multiuser	cifs credentials=/root/smbmultiuser.txt,multiuser,sec=ntlmssp 0 0
+
+mount /mnt/multiuser
+
+# su - brian
+= Try edit a file in /mnt/multiuser ** should deny
+= Add brian to cifscreds
+# cifscreds add serverx
+password:redhat
+= Try edit again
+
+
+A better way is to control the creeds in the user session.  Use cifscreds to do this 
+
+su - brian
+cifscreds add server2
+this prompts for password online

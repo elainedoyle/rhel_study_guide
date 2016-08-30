@@ -1,0 +1,42 @@
+
+INFO
+=====
+TLS: Transport Layer Security for encryption of traffic between client/server
+
+
+CREATING TLS CERTS
+==================
+
+*** Install crypto-utils package to use the cert generation tool: genkey
+# yum install -y crypto-utils
+# genkey FQDN
+key size 2048
+
+A number of files are generated in /etc/pki/tls
+
+1. /etc/pki/tls/private/fqdn.key
+This is the private key, should not be shared anywhere
+Should have 0400 perms
+Should have cert_t SELINUX label/context
+
+2.  /etc/pki/tls/certs/fqdn.0.csr
+This file is generated if you specified that you are going to CA for cert authority signing. You send this to the CA.
+
+3.  /etc/pki/tls/certs/fqdn.crt
+This its he returned file from CA
+This also could be generated if you choose: self-sign
+This is the PUBLIC CERT
+Should have perms 0644
+Should have cert_t SELINUX label/context
+
+
+HTTPD needs SSL_MOD module to extend functionality to include TLS
+=================================================
+Will automatically enable httpd to listen on 443
+Default virtual host config is in /etc/httpd/conf.d/ssl.conf
+
+Lots of new stuff there…have a look at one
+SSLEngine on 		** turns on TLS for this virtual host
+SSLCipherSuite		** says which encryption ciphers will be used
+
+

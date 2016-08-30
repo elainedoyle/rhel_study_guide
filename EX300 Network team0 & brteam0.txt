@@ -1,0 +1,106 @@
+ Network Team & Bridge
+=============================
+1 - confirm interfaces are ok for use
+=====================================
+# ip link
+
+
+Confirm teamd SW is installed
+# yum install -y teamd
+# systemctl status networkmanager
+
+=====================================
+2 - create active backup network team interface called team
+=====================================
+
+Create team interface first
+# nmcli con add type team   con-name team0   ifname team0 
+config ‘{“runner”: {“name”: “loadbalance”}}’
+
+Set the network configuration for the team
+# mmcli con mod team0 ipv4.addresses 10.0.0.10/24
+# mmcli con mod team0 ipv4.method manual
+
+
+Note: The interfaces used MUST be DOWN so ensure you’re in as root on the console
+=========================
+# nmcli con down enp0s3/enp0e8
+
+Assign interfaces
+=====================
+# nmcli con add type team-slave   ifname enp0s3     con-name team0-eth1  master team0
+# nmcli con add type team-slave   ifname enp0s8     con-name team0-eth1  master team0
+
+Enable/disable team
+=====================
+# mmcli con up team0
+# nmcli dev dis eth1
+
+
+Reload after all changes
+=====================
+# nmcli con reload
+or 
+# systemctl restart NetworkManager
+
+
+To check team config run teamdctl
+=====================
+# teamdctl team0 state
+
+Test operation
+===============
+To Test….set a ping going to your team IP address from another host
+then
+DISCONNECT the first interface 
+# nmcli dev dis enp0s3
+This should kickstart the other interface - to check
+# teamdctl team0 state 
+and check the ping
+To bring an interface BACK … use the ‘team0’ reference
+# mmcli con up team0-slave1
+repeat the same for enp0s8
+
+=========================
+3 - disable team0 then the NetworkManager service
+=========================
+# nmcli dev dis team0
+# systemctl stop NetworkManager
+# systemctl disable NetworkManager
+
+=========================
+4 - manipulate config files so team0 is attached to bridge called brteam0 w/ 192.168.0.100/24
+=========================
+# cd /etc/sysconfig/network-scripts
+# ls -1 ifcfg-*
+# vi ifcfg-brteam0
+add
+DEVICE=brteam0
+ONBOOT=yes
+TYPE=bridge
+IPADDR0=192.168.0.100
+PREFIX0=24
+or use nmtui -> use the defaults & add an IP/24
+cat /etc/sysconfig/network-scripts/ifcfg-brteam0
+
+
+=========================
+5 - reset network to start the new bridge & reactivate team0
+=========================
+systemctl start NetworkManager
+systemctl enable NetworkManager
+systemctl restart network
+
+
+=========================
+6 - reboot server & test network connectivity of the new bridge
+=========================
+reboot
+ping -I brteam0 192.168.0.254
+
+To check:
+nmcli dev show
+mmcli con show
+
+
+

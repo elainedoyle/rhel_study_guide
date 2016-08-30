@@ -1,0 +1,48 @@
+
+
+INSTALL/START HTTPD & CONFIGURE FIREWALL-CMD
+=======================
+# yum install http-manual webserver 
+(webserver contains http)
+# yum install -y policycoreutils-gui  
+# yum install firewall-config (if this is the first question you’re doing)
+
+
+Start and Enable the https service
+================================
+systemctl start httpd; 
+systemctl enable httpd
+
+Enable ports for http/https on the firewall
+# firewall-cmd —-permanent -—add-service=http  (https:443 http:80)
+# firewall-cmd —-reload
+# firewall-cmd —-list-all | grep http
+
+
+
+1st thing -> Add ServerAdmin stuff 
+=================
+vim /etc/httpd/conf/httpd.conf
+ServerAdmin webmaster@serverX.example.com
+
+
+Create the default content page
+===============================
+vim /var/www/html/index.html
+Hello Class!
+
+
+Start and Enable the https service
+================================
+systemctl restart httpd
+
+
+Check access
+===========
+In browser or at OS level run curl
+curl -k http://server2.example.com
+curl -k http://serverX.example.com/manual
+
+
+
+

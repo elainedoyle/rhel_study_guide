@@ -1,0 +1,80 @@
+All network ports need to have the correct SELINUX label/type
+This section deals with labels on ports ONLY
+
+=======================================================
+
+Packages: policycoreutils
+	  policycoreutils-gui (which installs the necessary selinux-policy-devel
+
+Man Pages: mandb (after installing the above
+	man -k _selinux | grep http (or just list all)
+	semanage
+	semanage-port
+	system-config-selinux
+
+GUI: system-config-selinux
+
+=======================================================
+
+Network traffic is tightly enforced by the SELinux Policy.
+E.g : Policy=targeted
+port 22/tcp has label ssh_port_t
+
+When a process wants to listen on that port, selinux checks to see if the label associated with that process is ALLOWED to bind that port label.
+
+Security Adv: Stops rogue services taking over ports (which should be used by legit services)
+
+Port labeling is VERY important when an administrator uses a non standard port to run a service.
+
+sometimes the relating policy already has a label associated with certain ports.
+e.g. 8008/tcp is sometimes used as an alternative port….and this already has the selinux label http_port_t associated with it.
+
+
+TO LIST PORT LABELS
+===================
+semanage port -l
+
+LIST PORT LABELS FOR http
+===================
+semanage port -l | grep http
+Note: a label shows up for udp & tcp ports
+
+Show local changes: semanage port -l -C
+
+
+TO ADD A PORT TO AN EXISTING LABEL TYPE
+=======================================
+# semanage port -a -t port_label -p tcp <port#>
+e.g.
+# semanage port -a -t gopher_port_t -p tcp 71
+
+
+MODIFY a PORT LABEL
+====================
+# semanage port -m -t http_port_t -p tcp 71
+
+
+EXERCISE: 
+=========
+Web application (new) is running on 82/tcp - a non-standard port… Permit connectivity & content being served here from your desktop…
+So whats needed.
+- bind port using selinux (think semanage and port label…http_port_t) to 82/tcp
+- restart httpd
+- use firewall-cmd to open port 82/tcp on your firewall for http in the permanent confutation
+
+1. Get correct port label
+# semanage port -l | grep http
+
+2. Assign the port label (if not already done)
+# semanage port -a -t http_port_t -p tcp 82
+
+3. Restart httpd
+# systemctl restart httpd
+
+4. Add firewall cmd & reload
+# firewall-cmd —-permanent -—add-port=82/tcp
+# firewall-cmd —-reload
+
+
+
+

@@ -1,0 +1,40 @@
+
+On server sharing the directory 
+============================
+Install packages: 	yum install -y nfs-utils
+
+Restart services: 	systemctl restart rcpbind
+			systemctl enable|start nfs
+			systemctl status rpcbind|nfs
+
+Add FW rule:		firewall-cmd -—permanent -—add-service=nfs
+			firewall-cmd —reload
+
+Create share:		mkdir /nfsshare
+			chown nfsnobody /nfsshare
+
+Add to /etc/exports:	vi /etc/exports	
+			/nfsshare server2(rw)
+			
+Reload exports:	exportfs -r
+
+
+On server mounting the share
+============================
+
+Create the mount location:	mkdir -p /mount/nfsshare
+
+Add share to /etc/fstab:	vi /etc/fstab
+				Syntax
+				HOSTNAME:SHARENAME	LOCAL_LOCATION TYPE DEFAULTS
+				server2:/nfsshare /mount/nfsshare nfs defaults 0 0
+
+Test:				mount -a; df -h
+				cd /mount/nfsshare
+				touch file
+				ls -l /mount/nfsshare/file
+				reboot
+				
+
+
+

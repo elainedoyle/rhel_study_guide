@@ -1,0 +1,74 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8560\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 Quick notes on setting up Kerberized NFS\
+================================\
+\
+Pre-reqs\
+========\
+1. ping dns \'97> in /etc/resolv.conf\
+2. ping kerberos server(if you know it) \'97> \
+3. check time sync on your host \'97> chrony -c. Check both hosts or your 2 servers ensure time AOK\
+\
+Begin the setup\
+================\
+- install nfs-utils \
+	\'97> yum install -y nfs-utils\
+- enable it but don\'92t start it yet \
+	\'97> systemctl enable nfs-server\
+- mkdir -p the directory you wish to create \
+	\'97> mkdir -p /srv/nfsexports\
+- Add line to vim /etc/exports\
+	 \'97> /srv/nfsexports *(rw)\
+\
+Services/Rules\
+============\
+- start nfs-server \'97> it will prob fail:\
+- check the dependencies in /usr/lib/systemd/system/nfs-server (see rpcbind & nfs-mountd)\
+  	\'97> systemctl start rpcbind nfs-mountd\
+	\'97> systemvtl enable rpcbind nfs-mountd\
+- then start nfs-server:\
+	\'97> systemctl start nfs-server\
+- add FW rule:  \
+	\'97>firewall-cmd \'97permanent \'97add-service=nfs \
+- check mount:\
+	\'97> show mount -e localhost\
+- check services (ifs rpcbind mountd should be there):\
+	\'97> firewall-cmd \'97list-all\
+\
+Accessibility of your NFS Share\
+========================\
+- On source\
+	\'97> chown nfsnobody /srv/nfsshare\
+\
+\
+Persistency of your NFS share (after reboot)\
+==================\
+-/ cp entry from systemd mount dir to the user location omwsdwwsdcv ;\'92\\\
+f mount files.\
+  This is a separate more elegant way to do nfs mount  i.e. not in /etc/fstab\
+	\'97> cp /usr/lib/sytemd/system/tmp.mount /etc/systemd/system\
+	\'97> cd /etc/systemd/system\
+	\'97> cp tmp.mount nfsshare.mount\
+	\'97> vi nfsfshare.mount & remove \'91documentation\'92 entries & leave options blank\
+	\'97> 	Description=NFS Share\
+		Where=/nfsshare\
+		What=server1.example.com\
+		Type=nfs\
+		Options=\
+- Start your new service\
+	\'97> systemctl start nfsshare.mount\
+- Reload sytemctl\
+	\'97> systemctl daemon-reload\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 	\'97> systemctl start nfsshare.mount\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 - Reboot to check\
+ \'85.if it doesn\'92t work\'85.. check old method\
+\
+vi /etc/fstab\
+	\'97> server1.example.com:/srv/nfsexport /my/nfshare 	nfs	defaults 0 0 \
+}

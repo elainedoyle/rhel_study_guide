@@ -1,0 +1,91 @@
+Network Interface Teaming
+=============================
+is similar to bonding.
+Where you want to get onto the same network you may want to use the ‘team’ driver to  connect different interfaces
+
+Links can be aggregated for increased through-put i.e. if you have 4 interfaces each 1G then you get increased throughput if you use the load-balancing option (dependent on the protocol you are using too)
+It makes the server more performant & protects against hw failures
+
+Difference between bonding & teaming
+====================================
+Bonding & Teaming use kernel drivers but teaming uses a different driver to bonding.
+Bonds may be required for backward compatibility
+
+Teaming also uses a user space daemon called ‘teamd’
+Teaming is more performant & will eventually replace bonding.
+
+teamd modes are called ‘runners’ the are
+- broadcast (all packages are processed by all interfaces)
+- roundrobin
+- activebackup
+- loadbalance
+- lacp
+
+** NOT SO IMPORTANT ***
+Creating a bonded interface
+===========================
+1. Create master interface first
+# nmcli con add type bond con-name bond0 ifname bond0 active-backup
+# nmcli con mod bond0 ipv4.address 10.0.0.10/24
+2. Add slave
+# nmcli con add type bond-slave …..
+
+bring up bond
+# nmcli con up bond0
+# nmcli dev dis eth1
+# cat /proc/net/bonding/bond0
+
+
+** VERY IMPORTANT ***
+
+Creating a teamed interface
+===============
+1. Create team interface first
+# nmcli con add type team   con-name team0   ifname team0 
+config ‘{“runner”: {“name”: “loadbalance”}}’
+
+NEAT PLACE TO SEE THIS /usr/share/doc/teamd*/example_configs
+
+
+2. ALWAYS ADD THE IP ADDRESS AFTER CREATING THE TEAM
+# nmcli con mod team0 ipv4.addresses 10.0.0.10/24
+# nmcli con mod team0 ipv4.method manual
+
+3. Assign interfaces
+# nmcli con add type team-slave   ifname eth0 
+   master team0    con-name team0-eth1
+# nmcli con add type team-slave   ifname eth1 
+   master team0    con-name team0-eth2
+
+4, Enable/disable team
+# nmcli con up team0
+# nmcli dev dis eth1
+
+
+Note: The interfaces used MUST be DOWN so ensure you’re in as root on the console
+=========================
+# nmcli con down eth0/eth1
+
+Reload after all changes
+# nmcli con reload
+or 
+# systemctl restart NetworkManager (if using nmtui)
+
+To check team config run teamdctl
+# teamdctl team0 state
+
+
+To Test….set a ping going to your team IP address from another host
+then
+DISCONNECT the first interface 
+# nmcli dev dis eth0
+This should kickstart the other interface - to check
+# teamdctl team0 state 
+and check the ping
+To bring an interface BACK … use the ‘team0’ reference
+# nmcli con up team0-slave1/2
+
+
+
+**** USE NMTUI ****
+

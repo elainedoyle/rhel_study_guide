@@ -1,0 +1,101 @@
+#EMAIL
+
+
+INTRO
+=======
+= Null Client is a machine that runs a local mail server which forwards emails to 
+an outbound mail relay for delivery
+= Previously /usr/sbin/sendmail => now in RH7 => postfix
+
+
+TRANSMISSION OF AN EMAIL MESSAGE
+===============================
+= mail client-> talks to outgoing mail server
+= ms -> relays that msg to the mail server using SMTP (simple mail transfer protocol)
+= Outbound mail relay may require NO auth from internal clients => server listens on 25/tcp
+= in essence the mail server is restricted to only hosts that can send through any IP restrictions on the FW
+= OB mail relay -> looks up DNS MX record
+= sends email to mail server in that record (server must accept email for the recipients domain)
+= relay uses SMTP on port 25/tcp to send the email to that server
+
+POSTFIX
+=========
+= a package (install via yum)
+= files /etc/postfix/main.cf (main config)
+= master file /etc/postfix/master.cf (controls what sub-services are started)
+
+
+IMPORTANT POSTFIX CONFIG SETTINGS
+================================
+M - myorigin                       (if someone generates a mail on this host ensure you tag it as coming from this server)
+
+
+M - mydestination 		   (what domains am I mail server endpoint for)
+				   Default: $myhostname, localhost
+
+M - mynetwork                     (allow mail to relay through this server if coming from defined comma separated IPs)
+ 			           ** if not defined in main.cf default is mynetworks_style = “subnet” => change to “host”
+			           Default: mynetworks = 127.0.0.0/8
+
+R - relayhost	  		  (forwards to this mail server for emails not destined for my domain)
+				   ** [] around the value suppresses DNS MX lookup 
+				   Default: relayhost = 
+
+I - inet_interfaces 		  (controls what Interfaces postfix listens on)			  
+				  ** can be ‘all’  ‘localhost’, can be 1/more hostnames/IP’s whitespace separated  
+			 	  Default inet_interfaces = localhost			 
+
+L - local_transport = 		  (determines what happens to local bound mail)
+				  Default: local_transport = local:$myhostname (delivers to /var/spool/mail)
+				  Can set to “local_transport = error: local delivery disabled
+
+
+QUERY POSTFIX
+===============
+#postconf <value>
+ e.g. #postconf relayhost inet_interfaces local_transport
+# cat/vim /etc/postfix/main.cf
+Where references to $value in the file => variables
+
+EDIT POSTFIX
+============
+#postfix -e ‘setting = value’
+#postfix -e ‘my origin = example.com’
+#systemctl reload postfix
+
+TROUBLESHOOTING
+===============
+# tail /var/log/maillog
+# postqueue -p/-f
+
+
+TO ACT AS A NULL CLIENT WHAT IS NECESSARY
+==========================================
+1) local delivery of mail is turned off
+2) mail send to an outbound relay for delivery
+3) users on the null client CAN run a mail client to send/read emails
+
+NULL CLIENT Example SETTINGS
+==========================
+#postconf -e ‘myorigin=desktop10.example.com’
+#postconf -e ‘mydestination=‘ 
+#postconf -e ‘mynetworks=127.0.0.0/8 [::1]/128’
+#postconf -e ‘relayhost=[smtp10.example.com]’
+#postconf -e ‘inet_interfaces=loopback-only’
+#postconf -e ‘local_transport=error: local transport disabled’
+
+Check config
+#postconf
+#systemctl restart postfix
+
+
+VERIFY CONFIG by EMAILING test EMAIL
+=====================================
+#mail -s “Server10 null client” student@desktop10.example.com
+Client TEST
+EOT
+
+Check mail arrival using “mutt”
+#mutt -f imaps://imap10.example.com
+username/password
+m for mail

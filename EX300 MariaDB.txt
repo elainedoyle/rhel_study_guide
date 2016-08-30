@@ -1,0 +1,92 @@
+#MariaDB
+
+-install packages
+#yum -y groupinstall mariadb mariadb-client
+Note: ensure you install the mariadb-client on the server that will be used to test your lab
+
+**** Don’t forget to enable the firewall
+#firewall-cmd -—permanent —-add-service=mysql;
+#firewall-cmd —-reload;
+
+-secure install
+#mysql_secure_installation
+  - blank for pw (then set one)
+  - disable remote root login to your db
+  - remove anonymous user
+  - removes test db (keep if you like)
+
+-Check what interfaces mariaDB is listening on
+#ss -tupln | grep mysql
+OR
+#netstat -tupan | grep mysql
+
+-config in 
+#/etc/my.cnf
+
+- To enable mariadb to ONLY take connections from LOCAL clients add the following line under [mysqld]
+# vim /etc/my.cnf
+[mysqld]
+skip-networking=1
+
+-Check what interfaces mariaDB is listening on
+#ss -tupln | grep mqsql
+(this will reply NONE if you have the above value)
+
+- LOGIN
+check that root can log in with the pw specified by you in the above
+Direct login w/o a password
+#mysql -u <user>
+
+Login w password
+#mysql -u root -p 		** must specify -p (for pw)
+Note: If your DB can login directly and you’re asked to restrict this you can set a password as follows
+#set password for ‘root’@‘localhost’=password(‘redhat’);
+
+
+
+- look at existing schemas in the db, create a schema & make it usable
+#show databases;
+#create database inventory;
+#show databases;
+#use inventory;
+#use mysql;			*** this database holds user & grant info  (select user,host from user;)
+  mysql>  show tables;
+  mysql>  describe servers;   
+
+
+
+-Granting privs
+#grant select,update,delete,insert on mysql.servers to user@host;
+#flush privileges;
+#show grants for user@host;
+#insert into category(name) values('MEMORY');
+
+- Creating remote users
+#create user rob@‘%’ identified by ‘rob_password’;
+#grant select on <database>.<table> to rob@‘%’;
+
+Note: ‘%’ allows connection from any host but NOT localhost !
+need another login if required from localhost and remote host for same username.
+
+-Backing up MARIADB -> create DB EXPORT/DUMP
+**** TO BACKUP USE mysqldump
+#mysqldump -u root -p inventory > /inventory.dump  ** -p asks you for a password to do the dump
+#mysqldump -u root -p --all-databases > /mariadb.dump
+
+-where are db files
+#mysqladmin variables| grep datadir
+
+-Restoring db
+***** TO RESTORE USE mysql…NOTE: THE SCHEMAS MUST EXIST IN THE DB ALREADY
+#mysql -u root inventory < /inventory.dump
+
+
+- Updating tables
+update tablename(value) set values(‘value’) where id=‘<row_id>’;
+insert into manufacturer(name,seller,phone) values(‘HP’,’John Doe’,’+44 7813 003256’);
+
+
+
+
+
+

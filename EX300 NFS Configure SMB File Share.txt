@@ -1,0 +1,105 @@
+
+
+SMB (Server Message Block) File Shares
+=======================
+Packages: cifs-utils, samba, samba-client
+utilities: smbpasswd
+Config file: /etc/samba/smb.conf
+Services: smb nmb
+Firewall: samba
+Refs:
+
+======================
+THINGS TO KNOW
+======================
+
+List all selinux contexts for samba
+# semanage_fcontext -l | grep -i samba
+
+selinux boolean is samba_enable_home_dirs=on
+# setsebool -P samba_enable_home_dirs=on
+
+Verify config file /etc/samba/smb.conf
+# testparm
+
+Setting passwords for samba users is possible
+# smbpasswd -a fred
+
+Alternatively you can no create a user that has no linux login for the purpose
+# useradd -s /bin/nologin fred
+
+
+INSTALLATION
+============
+# yum install -y samba cifs-utils samba-client
+# systemctl start smb nmb
+# systemctl enable smb nmb
+# firewall-cmd —permanent —add-service=samba
+# firewall-cmd —reload
+# firewall-cmd —list-all
+
+TASK
+=========
+- Configure SMB share on serverx, dir: /smbshare
+- @marketing have rw, everyone else read
+- workgroup: mycompany, share name: smbshare
+- brian(smbpasswd -a brian) passwd:redhat part of marketing team
+  useradd -s /bin/nologin
+  groupdda -G marketing
+  rob (smbpasswd -a brian) passwd:redhat NOT part of marketing team
+  useradd -s /bin/nologin
+
+
+
+=============
+On Server
+========
+= Install package
+yum install -y samba samba-client(contains smbpasswd)
+
+=  Create /smbshare & sort perms
+mkdir /smbshare
+chmod g+s /smbshare; chmod o-w /smbshare (2775)
+groupadd -r marketing
+chgrp marketing /smbshare
+
+= Do selinux stuff
+semanage fcontext -a -t samba_share_t ‘/smbshare(/.*)?’
+restorecon -vvFR /smbshare
+
+
+= modify /etc/samba/smb.conf
+workgroup = my company
+security = user
+[smbshare]
+path = /smbshare
+write list = @marketing
+
+= Create users
+# useradd -s /sbin/nologin -G marketing brian
+# smbpasswd -a brian
+redhat
+# useradd -s /sbin/nologin rob
+# smbpasswd -a rob 
+redhat
+
+
+= Start smb nmb services
+# systemctl restart smb nmb (or start/enable)
+# firewall-cmd —permanent —add-service=samba
+# firewall-cmd —reload
+
+=============
+On Desktop
+=============
+yum -y install cifs-utils (has mount.cifs command)
+
+Test users brian & robs access
+
+create test dirs to mount the samba file share FROM servers
+# mkdir -p /mnt/{brian,rob}
+
+# mount -o username=brian //serverx/smbshare /mnt/brian (should be able to write)
+# mount -o username=rob //serverx/smbshare /mnt/rob (should only be abke to read)
+
+
